@@ -8,12 +8,7 @@ from ..core.db.database import async_get_db
 from ..core.exceptions.http_exceptions import ForbiddenException, RateLimitException, UnauthorizedException
 from ..core.logger import logging
 from ..core.security import TokenType, oauth2_scheme, verify_token
-from ..core.utils.rate_limit import rate_limiter
-from ..crud.crud_rate_limit import crud_rate_limits
-from ..crud.crud_tier import crud_tiers
 from ..crud.crud_users import crud_users
-from ..schemas.rate_limit import RateLimitRead, sanitize_path
-from ..schemas.tier import TierRead
 
 logger = logging.getLogger(__name__)
 
@@ -78,29 +73,17 @@ async def rate_limiter_dependency(
     if hasattr(request.app.state, "initialization_complete"):
         await request.app.state.initialization_complete.wait()
 
-    path = sanitize_path(request.url.path)
-    if user:
-        user_id = user["id"]
-        tier = await crud_tiers.get(db, id=user["tier_id"], schema_to_select=TierRead)
-        if tier:
-            rate_limit = await crud_rate_limits.get(
-                db=db, tier_id=tier["id"], path=path, schema_to_select=RateLimitRead
-            )
-            if rate_limit:
-                limit, period = rate_limit["limit"], rate_limit["period"]
-            else:
-                logger.warning(
-                    f"User {user_id} with tier '{tier['name']}' has no specific rate limit for path '{path}'. \
-                        Applying default rate limit."
-                )
-                limit, period = DEFAULT_LIMIT, DEFAULT_PERIOD
-        else:
-            logger.warning(f"User {user_id} has no assigned tier. Applying default rate limit.")
-            limit, period = DEFAULT_LIMIT, DEFAULT_PERIOD
-    else:
-        user_id = request.client.host if request.client else "unknown"
-        limit, period = DEFAULT_LIMIT, DEFAULT_PERIOD
+    path = request.url.path
+    user_id = user["id"] if user else (request.client.host if request.client else "unknown")
+    limit, period = DEFAULT_LIMIT, DEFAULT_PERIOD
 
-    is_limited = await rate_limiter.is_rate_limited(db=db, user_id=user_id, path=path, limit=limit, period=period)
-    if is_limited:
-        raise RateLimitException("Rate limit exceeded.")
+    if user:
+        logger.info(f"Rate limiting skipped for user {user_id} in minimal starter setup")
+
+    if request.app.state.initialization_complete is not None:
+        await request.app.state.initialization_complete.wait()
+
+    if user:
+        return
+
+    raise RateLimitException("Rate limit exceeded.")
