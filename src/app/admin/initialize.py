@@ -1,10 +1,22 @@
 from typing import Optional
 
 from crudadmin import CRUDAdmin
+from sqlalchemy.exc import IntegrityError
 
 from ..core.config import EnvironmentOption, settings
 from ..core.db.database import async_get_db
 from .views import register_admin_views
+
+
+async def initialize_admin_safely(admin: CRUDAdmin) -> None:
+    """Initialize the admin interface while tolerating duplicate initial-admin inserts."""
+    try:
+        await admin.initialize()
+    except IntegrityError as exc:
+        message = str(exc).lower()
+        if "unique constraint failed" in message and "admin_user.username" in message:
+            return
+        raise
 
 
 def create_admin_interface() -> Optional[CRUDAdmin]:
