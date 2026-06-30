@@ -2,7 +2,7 @@ from typing import Any
 
 from fastapi.encoders import jsonable_encoder
 
-from src.app import models
+from src import models
 from tests.conftest import fake
 
 

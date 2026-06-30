@@ -14,7 +14,7 @@ A small and beginner-friendly FastAPI project focused on a simple user model and
 
 ```bash
 uv sync
-uv run uvicorn src.app.main:app --reload
+uv run uvicorn src.main:app --reload
 ```
 
 Then open:
@@ -28,12 +28,16 @@ Create a file named `src/.env` and set the basic values you need. The project us
 ## Project structure
 
 ```text
-src/app/
+src/
   main.py
-  api/v1/users.py
+  users/
+  posts/
+  tiers/
+  rate_limits/
+  auth/
+  health/
+  tasks/
   core/
-  models/
-  schemas/
 ```
 
 ## Notes

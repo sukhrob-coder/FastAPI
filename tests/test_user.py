@@ -4,9 +4,9 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from src.app.api.v1.users import erase_user, patch_user, read_user, read_users, write_user
-from src.app.core.exceptions.http_exceptions import DuplicateValueException, ForbiddenException, NotFoundException
-from src.app.schemas.user import UserCreate, UserRead, UserUpdate
+from src.exceptions import DuplicateValueException, ForbiddenException, NotFoundException
+from src.users.router import erase_user, patch_user, read_user, read_users, write_user
+from src.users.schemas import UserCreate, UserRead, UserUpdate
 
 
 class TestWriteUser:
@@ -17,12 +17,12 @@ class TestWriteUser:
         """Test successful user creation."""
         user_create = UserCreate(**sample_user_data)
 
-        with patch("src.app.api.v1.users.crud_users") as mock_crud:
+        with patch("src.users.router.crud_users") as mock_crud:
             # Mock that email and username don't exist
             mock_crud.exists = AsyncMock(side_effect=[False, False])  # email, then username
             mock_crud.create = AsyncMock(return_value=sample_user_read.model_dump())
 
-            with patch("src.app.api.v1.users.get_password_hash") as mock_hash:
+            with patch("src.users.router.get_password_hash") as mock_hash:
                 mock_hash.return_value = "hashed_password"
 
                 result = await write_user(Mock(), user_create, mock_db)
@@ -37,7 +37,7 @@ class TestWriteUser:
         """Test user creation with duplicate email."""
         user_create = UserCreate(**sample_user_data)
 
-        with patch("src.app.api.v1.users.crud_users") as mock_crud:
+        with patch("src.users.router.crud_users") as mock_crud:
             # Mock that email already exists
             mock_crud.exists = AsyncMock(return_value=True)
 
@@ -49,7 +49,7 @@ class TestWriteUser:
         """Test user creation with duplicate username."""
         user_create = UserCreate(**sample_user_data)
 
-        with patch("src.app.api.v1.users.crud_users") as mock_crud:
+        with patch("src.users.router.crud_users") as mock_crud:
             # Mock email doesn't exist, but username does
             mock_crud.exists = AsyncMock(side_effect=[False, True])
 
@@ -65,7 +65,7 @@ class TestReadUser:
         """Test successful user retrieval."""
         username = "test_user"
 
-        with patch("src.app.api.v1.users.crud_users") as mock_crud:
+        with patch("src.users.router.crud_users") as mock_crud:
             user_dict = sample_user_read.model_dump()
             mock_crud.get = AsyncMock(return_value=user_dict)
 
@@ -81,7 +81,7 @@ class TestReadUser:
         """Test user retrieval when user doesn't exist."""
         username = "nonexistent_user"
 
-        with patch("src.app.api.v1.users.crud_users") as mock_crud:
+        with patch("src.users.router.crud_users") as mock_crud:
             mock_crud.get = AsyncMock(return_value=None)
 
             with pytest.raises(NotFoundException, match="User not found"):
@@ -96,10 +96,10 @@ class TestReadUsers:
         """Test successful users list retrieval."""
         mock_users_data = {"data": [{"id": 1}, {"id": 2}], "count": 2}
 
-        with patch("src.app.api.v1.users.crud_users") as mock_crud:
+        with patch("src.users.router.crud_users") as mock_crud:
             mock_crud.get_multi = AsyncMock(return_value=mock_users_data)
 
-            with patch("src.app.api.v1.users.paginated_response") as mock_paginated:
+            with patch("src.users.router.paginated_response") as mock_paginated:
                 expected_response = {"data": [{"id": 1}, {"id": 2}], "pagination": {}}
                 mock_paginated.return_value = expected_response
 
@@ -122,7 +122,7 @@ class TestPatchUser:
         user_dict = sample_user_read.model_dump()
         user_dict["username"] = username
 
-        with patch("src.app.api.v1.users.crud_users") as mock_crud:
+        with patch("src.users.router.crud_users") as mock_crud:
             mock_crud.get = AsyncMock(return_value=user_dict)
             mock_crud.exists = AsyncMock(return_value=False)
             mock_crud.update = AsyncMock(return_value=None)
@@ -140,7 +140,7 @@ class TestPatchUser:
         user_dict = sample_user_read.model_dump()
         user_dict["username"] = username
 
-        with patch("src.app.api.v1.users.crud_users") as mock_crud:
+        with patch("src.users.router.crud_users") as mock_crud:
             mock_crud.get = AsyncMock(return_value=user_dict)
 
             with pytest.raises(ForbiddenException):
@@ -157,11 +157,11 @@ class TestEraseUser:
         sample_user_read.username = username
         token = "mock_token"
 
-        with patch("src.app.api.v1.users.crud_users") as mock_crud:
+        with patch("src.users.router.crud_users") as mock_crud:
             mock_crud.get = AsyncMock(return_value=sample_user_read)
             mock_crud.delete = AsyncMock(return_value=None)
 
-            with patch("src.app.api.v1.users.blacklist_token", new_callable=AsyncMock) as mock_blacklist:
+            with patch("src.users.router.blacklist_token", new_callable=AsyncMock) as mock_blacklist:
                 result = await erase_user(Mock(), username, current_user_dict, mock_db, token)
 
                 assert result == {"message": "User deleted"}
@@ -174,7 +174,7 @@ class TestEraseUser:
         username = "nonexistent_user"
         token = "mock_token"
 
-        with patch("src.app.api.v1.users.crud_users") as mock_crud:
+        with patch("src.users.router.crud_users") as mock_crud:
             mock_crud.get = AsyncMock(return_value=None)
 
             with pytest.raises(NotFoundException, match="User not found"):
@@ -187,7 +187,7 @@ class TestEraseUser:
         sample_user_read.username = username
         token = "mock_token"
 
-        with patch("src.app.api.v1.users.crud_users") as mock_crud:
+        with patch("src.users.router.crud_users") as mock_crud:
             mock_crud.get = AsyncMock(return_value=sample_user_read)
 
             with pytest.raises(ForbiddenException):
